@@ -11,25 +11,25 @@ smartyTpl
 
 > 2、smarty模板解析部分只需要向如下方式引入，这样写的目的是为了让 `literal` 标签导致tpl不解析而执行让tpl可以在smarty需要解析的地方解析。    
 
-<pre>
+````
     {%include file="./result.tpl" assign="template_string"%} 
     {%include file="string:$template_string"%}
-</pre>
+````
   
 > 3、创建script标签    
 
-<pre>
+````
     <script id="result-tpl" type="text/template">    
         {%include file="./result.tpl"%} 
     </script>
-</pre> 
+````
     
 > 4、需要用前端模板渲染的时候只需要调用：
 
-<pre>
+````
     var smartyTpl = require('smartyTpl');
     smartyTpl.format('result-tpl', {
         tplData: data,
         feRoot: root
     }, 'result-list');
-</pre>
+````
