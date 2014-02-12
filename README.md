@@ -1,22 +1,30 @@
 smartyTpl
 =========
 
-#####这个工具是Smarty模板在前端使用的一种解决方案。
+#####前后端共用smarty模板的一种解决方案。
 
-开发前端时，为了防止页面抖动，会在页面加载的时候用 `Smarty` 后端渲染技术先产生首屏的结果页，然后翻页或者筛选，通过 `Ajax` 获取后端数据后继续渲染页面。一般的做法是，首屏通过 `Smarty` 语法写一遍，然后在前端添加script的前端模板，利用一些模板引擎，例如 `handlebars`, `ejs`, `artTemplate`, 来script模板进行数据渲染，这样就导致了一个页面中也写两份模板，一份是 `Smarty模板`，一份是 `script模板`，而且两份模板结构类似，只是语法不同，通过实际开发会发现同时维护两套模板是非常浪费时间的，还容易出错。
+遇到场景：首屏数据通过后端渲染后整个输出，后续交互再异步获取数据重新渲染这部分区域。这样就会有两部分的开发：后端模板和前端模板的编写，前后端两套模板的出现会导致开发成本提高，并且后续维护复杂。
 
-#####`smartyTpl` 就是为了防止一个页面出现两个模板做出来的一套工具。具体用法如下：
+解决思路：通过工具转化后端语法，让其可以产生前端可用模板。
 
-> 1、需要将前端模板和smarty模板渲染重复的一部分提取到一个tpl文件(例如：result.tpl)中，然后头部添加 `{%literal%}`, 尾部添加 `{%/literal%}`,这样做是为了引入文件的时候按照字符串来引，而不解析。
+#####`smartyTpl` 具体用法如下：
 
-> 2、smarty模板解析部分只需要向如下方式引入，这样写的目的是为了让 `literal` 标签导致tpl不解析而执行让tpl可以在smarty需要解析的地方解析。    
+#####1、抽取模板到tpl文件中(例如：result.tpl),然后文件头部添加 `{%literal%}`,尾部添加 `{%/literal%}`,目的是阻止smarty语法解析。
+
+#####2、引入模板
+
+######1）smarty模板
+
+因tpl已添加`literal`标签,用传统的include引入文件方式后端不会解析,需要利用include从字符串方式让smarty模板可以解析。
 
 ````
-    {%include file="./result.tpl" assign="template_string"%} 
-    {%include file="string:$template_string"%}
+    {%include file="./result.tpl" assign="tpl_string"%} 
+    {%include file="string:$tpl_string"%}
 ````
   
-> 3、创建script标签    
+######2）前端模板    
+
+直接新建一个type=text/template的script标签,用传统的include方式引入放入标签中     
 
 ````
     <script id="result-tpl" type="text/template">    
@@ -24,7 +32,7 @@ smartyTpl
     </script>
 ````
     
-> 4、需要用前端模板渲染的时候只需要调用：
+#####3、需要用前端模板渲染的时候只需要调用：
 
 ````
     var smartyTpl = require('smartyTpl');
