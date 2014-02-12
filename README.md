@@ -9,13 +9,32 @@ smartyTpl
 
 #####`smartyTpl` 具体用法如下：
 
-#####1、抽取模板到tpl文件中(例如：result.tpl),然后文件头部添加 `{%literal%}`,尾部添加 `{%/literal%}`,目的是阻止smarty语法解析。
+#####1、处理前后端公共模板
+
+抽取模板到tpl文件中，文件头部添加 `{%literal%}`，尾部添加 `{%/literal%}`，目的是阻止smarty语法解析。
+
+````
+    {%literal%}
+        <!--没有产品的情况-->
+        {%if $tplData.count == 0%}
+        <li class="list-item no-list-item">
+            <div class="cry-face"></div>抱歉，没有找到符合的信用卡产品，再挑挑看吧：）
+        </li>
+        {%/if%}
+
+        <!--页面在如的时候初始化列表数据-->
+        {%foreach from=$tplData.list item=item%}
+            ...
+        {%/foreach%}
+    {%/literal%}
+````
+
 
 #####2、引入模板
 
 ######1）smarty模板
 
-因tpl已添加`literal`标签,用传统的include引入文件方式后端不会解析,需要利用include从字符串方式让smarty模板可以解析。
+因tpl已添加`literal`标签，用传统的include引入文件方式后端不会解析，需要利用include从字符串方式让smarty模板可以解析。
 
 ````
     {%include file="./result.tpl" assign="tpl_string"%} 
@@ -24,7 +43,7 @@ smartyTpl
   
 ######2）前端模板    
 
-直接新建一个type=text/template的script标签,用传统的include方式引入放入标签中     
+直接新建一个type=text/template的script标签，用传统的include方式引入放入标签中。
 
 ````
     <script id="result-tpl" type="text/template">    
@@ -32,12 +51,12 @@ smartyTpl
     </script>
 ````
     
-#####3、需要用前端模板渲染的时候只需要调用：
+#####3、使用前端模板
 
 ````
     var smartyTpl = require('smartyTpl');
     smartyTpl.format('result-tpl', {
         tplData: data,
         feRoot: root
-    }, 'result-list');
+    }， 'result-list');
 ````
