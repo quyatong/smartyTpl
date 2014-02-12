@@ -1,10 +1,6 @@
-/*
- * 用于前端使用的smarty template
- * Copyright 2013 Baidu Inc. All rights reserved.
- * 
- * path: smartyTpl.js
- * author: quyatong(quyatong@baidu.com)
- * date: 2013/10/09
+/**
+ * @file 用于前端使用的smarty template
+ * @author quyatong(quyatong@baidu.com)
  */
 
 define(function(require) {
@@ -13,13 +9,30 @@ define(function(require) {
     var template = require('./template');
 
     // 配置
-    var config = {
-        leftToken: '\{%',
-        rightToken: '%\}',
+    var CONFIG = {
+        leftToken: '{%',
+        rightToken: '%}',
         tplLeftToken: '<%',
         tplRightToken: '%>'
     };
 
+    // smarty 中的运算符号转义成js中的运算符号
+    var EXP_ESCAPE_MAP = {
+        'neq': '!=',
+        'ne': '!=',
+        'eq': '==',
+        'gt': '>',
+        'lt': '<',
+        'gte': '>=',
+        'ge': '>=',
+        'lte': '<=',
+        'le': '<=',
+        'and': '&&',
+        'not': '!',
+        'or': '||'
+    };
+    
+    var cache = {};
     /**
      * 避免使用第三方基础类库
      * 只添加了用到的一些函数
@@ -29,12 +42,11 @@ define(function(require) {
         array: {
             indexOf: function (source, match, fromIndex) {
                 var len = source.length;
-                var iterator = match;
                     
                 fromIndex = fromIndex | 0;
 
                 if(fromIndex < 0){//小于0
-                    fromIndex = Math.max(0, len + fromIndex)
+                    fromIndex = Math.max(0, len + fromIndex);
                 }
 
                 for ( ; fromIndex < len; fromIndex++) {
@@ -59,21 +71,26 @@ define(function(require) {
                 if ('function' == typeof iterator) {
                     for (i = 0; i < len; i++) {
                         item = source[i];
-                        //此处实现和标准不符合，标准中是这样说的：
-                        //If a thisObject parameter is provided to forEach, 
-                        //it will be used as the this for each invocation 
-                        //of the callback. If it is not provided, or is null, 
-                        //the global object associated with callback is used instead.
-                        returnValue = iterator.call(thisObject || source, item, i);
+                        // 此处实现和标准不符合，标准中是这样说的：
+                        // If a thisObject parameter is provided to forEach, 
+                        // it will be used as the this for each invocation 
+                        // of the callback. If it is not provided, or is null, 
+                        // the global object associated 
+                        // with callback is used instead.
+                        
+                        returnValue = iterator.call(
+                            thisObject || source, item, i
+                        );
+                        
                         if (returnValue === false) {
                             break;
                         }
                     }
                 }
                 return source;
-            };
+            }
         }
-    }
+    };
 
     // 标示符列表
     var IDENTIFIERS = [
@@ -83,9 +100,6 @@ define(function(require) {
         'section',
         'assign'
     ];
-
-    // 这个cache是为了把smarty的模板缓存起来
-    var cache = {};
 
     /**
      * 类似于 "a=1 b=2"格式的字符串转变为 对象：{a: 1, b: 2} 
@@ -108,22 +122,96 @@ define(function(require) {
      * 插件函数枚举（用于处理相关函数）
      * @type {Object}
      */
+
+
     var plugIns = {
         escape: function (operand, params) {
-            return operand;
+            
+            return operand + '&&' + operand + '.toString()';
         },
         highlight: function (operand, params) {
-            return operand;
+            
+            return operand + '&&' + operand + '.toString()';
         },
         strpos: function (operand, params) {
+            
             return '((' + operand + ' + \'\').indexOf(' + params[0] + ') >= 0)';
         },
         count: function (operand, params) {
+            
             return operand + '.length';
         },
-        is_array: function (operand, params) {
+        'is_array': function (operand, params) {
+            
             return '((typeof ' + operand + ') == "object")';
+        },
+        isset: function (operand, params) {
+            
+            // js实现isset函数 
+            var isset = function (param, paramsText) {
+
+                var currentUsed = param;
+                var vars = paramsText.split('.');
+                var last = vars.pop();
+                vars.shift();
+
+                for (var i = 0; i < vars.length; i++) {
+                    currentUsed = currentUsed[vars[i]];
+                }
+
+                if (currentUsed.hasOwnProperty(last)) {
+                    return true;
+                } 
+                else {
+                    return false;
+                }
+            };
+            var vars = operand.split('.');
+
+            return '(' + isset.toString().replace(/\s\s+/g, '')  + ')(' 
+                + vars[0] 
+                + ', "' 
+                + operand 
+                + '")';
+        },
+        empty: function (operand, params) {
+            var empty = function (param) {
+                if (
+                    param === 0 
+                    || param === '0' 
+                    || param === '' 
+                    || param === null 
+                    || param === undefined
+                ) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            };
+
+            return '(' 
+                + empty.toString().replace(/\s\s+/g, '') 
+                + ')'
+                + '(' + operand + ')';
+        },
+        'default': function (operand) {
+            return '(' + operand + ')';
         }
+    };
+
+    /**
+     * 插件代理函数
+     * @param  {string} func    插件名称
+     * @param  {string} operand 操作数
+     * @param  {string} params  传入的参数
+     * @return {string}         转换之后的字符串
+     */
+    var plugInProxy = function (func, operand, params) {
+        operand = operand.replace(/@/g, '.__');
+        (!plugIns[func]) && (func = 'default');
+        
+        return plugIns[func](operand, params);
     };
 
     /**
@@ -141,7 +229,8 @@ define(function(require) {
                 function (exp, funcName, funcParamsStr){
                     var funcParams = funcParamsStr.split(/\s*,\s*/);
                     var operand = funcParams.shift();
-                    return plugIns[funcName](operand, funcParams);
+
+                    return plugInProxy(funcName, operand, funcParams);
                 }
             );
         }
@@ -151,7 +240,7 @@ define(function(require) {
                 var funcName = arr[0];
                 arr.shift();
                 var funcParams = arr;
-                operand = plugIns[funcName](operand, funcParams);
+                operand = plugInProxy(funcName, operand, funcParams);
             });
         }
         return operand;
@@ -163,23 +252,72 @@ define(function(require) {
      */
     var handler = {
         'foreach': function (expression) {
+            var from;
+            var item;
+            var key;
 
-            var attrs = kv2objs(expression);
-            var item = attrs['item'];
-            var from =  attrs['from'];
+            if (/([^\s]*)\s+as\s+([^\s]*)/g.test(expression)) {
 
-            return [
+                from =  RegExp.$1;
+                item = RegExp.$2;
+                if (/([^\s]*)\s*==>\s*([^\s]*)/g.test(item)) {
+                    key = RegExp.$1;
+                    item = RegExp.$2;
+                } 
+            }
+            else {
+                var attrs = kv2objs(expression);
+                from =  attrs['from'] 
+                    ? attrs['from'].replace(/['"]/g, '') 
+                    : undefined;
+                item = attrs['item'] 
+                    ? attrs['item'].replace(/['"]/g, '') 
+                    : undefined;
+                key = attrs['key'] 
+                    ? attrs['key'].replace(/['"]/g, '') 
+                    : undefined;
+            }
+
+            var convert = function (ii) {
+                if (typeof ii != 'object') {
+                    return {
+                        toString: function () {
+                            return ii;
+                        },
+                        toValue: function () {
+                            return ii;
+                        }
+                    };
+                }
+                else {
+                    return ii;
+                }
+            };
+
+            var text = [
                 'for (',
-                    'var ' + item + 'Index = 0,',
-                    item + ' = ' + from + '[' + attrs['item'] + 'Index]' + '; ',
-                    item + 'Index < ' + from + '.length,',
-                    item + ' = ' + from + '[' + attrs['item'] + 'Index]' + '; ',
+                    'var ' + item + 'Index = 0, ',
+                    item + ' = ' + from + '[' + item + 'Index]',
+                    ((key !== undefined) ? (','+ key + ' = 0') : ''),
+                    ';',
+                    '(' + item + 'Index < ' + from + '.length)',
+                    ' && ((' + item + ' = '
+                        + from + '[' + item + 'Index]) || true)',
+                    ' && (' + item + ' = '
+                        + '(' + convert.toString().replace(/\s\s+/g, '') 
+                        + '(' + item + ')))',
+                    ' && ((' + item + '.__index = ' + item + 'Index) || true)',
+                    ' && ((' + item + '.__first = ' + from + '[0] ) || true)',
+                    ' && ((' + item + '.__last = ' 
+                        + from + '[' + from + '.length - 1] ) || true)',
+                    ';',
                     item + 'Index++',
+                    ((key !== undefined) ? (', ' + key + '++') : ''),
                 ') {'
             ].join('');
+            return text;
         },
         'section': function (expression) {
-
             var attrs = kv2objs(expression);
 
             return [
@@ -203,9 +341,21 @@ define(function(require) {
             return calculate(expression) + ';';
         },
         'print': function (expression) {
-            return '=' + calculate(expression);
+            return '=' + calculate(expression) + '.toString()';
         },        
         'if': function (expression) {
+            var tokens = [];
+            for (var key in EXP_ESCAPE_MAP) {
+                tokens.push(key);
+            }
+
+            expression = expression.replace(
+                new RegExp('\\s+(' + tokens.join('|') + ')\\s+', 'g'), 
+                function (match, token) {
+                    return EXP_ESCAPE_MAP[token];
+                }
+            );
+            
             return 'if (' + calculate(expression) + ') {';
         },
         'else': function (expression) {
@@ -224,14 +374,22 @@ define(function(require) {
      * @param  {string} id 模板的id
      * @return {string}    编译模板产生的模板字符串
      */
-    var compile = function (id) {
-        var tpl = document.getElementById(id).innerHTML;
+    var compile = function (tpl) {
         var tokenReg = new RegExp(
-            config.leftToken 
+            CONFIG.leftToken 
             + '\\s*(.*?\\s*)\\s*' 
-            + config.rightToken, 'g'
+            + CONFIG.rightToken, 'g'
         );
 
+        // strip 处理
+        tpl = tpl.replace(
+            /\{%\s*strip\s*%\}([\s\S]*)?\{%\s*\/\s*strip\s*%\}/g, 
+            function (match, expression) {
+                return expression;
+            }
+        );
+
+        
         tpl = tpl.replace(tokenReg, function(match, expression) {
 
             // 标识符
@@ -250,8 +408,14 @@ define(function(require) {
             // 如果没有标识符，得区分是否是输出表达式、结束符号、计算表达式
             else {
                 // 输出表达式
-                if (/^[$.a-zA-Z0-9|()].*$/g.test(expression)) {
+                if (/^[$.a-zA-Z0-9|()]*$/g.test(expression)) {
+                    
                     identifier = 'print';
+
+                    if (expression == 'break') {
+                        identifier = 'break';
+                    }
+
                     operationExpression = expression;
                 }
                 // 如果是结束符号
@@ -260,22 +424,27 @@ define(function(require) {
                     operationExpression = '}';
                 }
                 // 计算表达式
-                else {
+                else if (/=/.test(expression)) {
                     identifier = 'calc';
+                    operationExpression = expression;
+                }
+                else {
+                    identifier = 'print';
                     operationExpression = expression;
                 }
             }
 
             operationExpression = operationExpression.replace(/\$/g, '');
+            operationExpression = operationExpression.replace(/@/g, '.__');
 
-            return config.tplLeftToken 
-                + handler[identifier](operationExpression)
-                + config.tplRightToken;
+            return CONFIG.tplLeftToken 
+                + (
+                    handler[identifier] 
+                    ? handler[identifier](operationExpression) 
+                    : ''
+                )
+                + CONFIG.tplRightToken;
         });
-        cache[id] = tpl;
-
-        // 从dom中去掉这个script 标签
-        document.body.removeChild(document.getElementById(id));
         return tpl;
     };
 
@@ -287,8 +456,21 @@ define(function(require) {
      * @return {string}             生成的HTML片段
      */
     var format = function (scriptId, data, containerId) {
-        var tpl = cache[scriptId] ? cache[scriptId] : compile(scriptId);
 
+        // 如果缓存中没有开始编译
+        if (!cache[scriptId]) {
+
+            var scriptContent = document.getElementById(scriptId).innerHTML;
+            
+            cache[scriptId] = compile(scriptContent);
+            // 从dom中去掉这个script 标签
+            document.body.removeChild(document.getElementById(scriptId));
+        }
+
+        // 取到要选择的片段
+        var tpl = cache[scriptId];
+
+        // 塞入html中
         document.getElementById(
             containerId
         ).innerHTML = template.render(

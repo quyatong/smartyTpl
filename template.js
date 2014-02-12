@@ -1,5 +1,5 @@
 /*
- * 改写成符合amd规范的artTemplate
+ * 改写成符合amd规范的artTemplate 
  * artTemplate - Template Engine
  * https://github.com/aui/artTemplate
  * Released under the MIT, BSD, and GPL Licenses
@@ -22,7 +22,7 @@ define(function(require) {
         ].apply(template, arguments);
     };
 
-    var exports = {}
+    var exports = {};
     exports.version = '2.0.1';
     exports.openTag = '<%'; // 设置逻辑语法开始标签
     exports.closeTag = '%>'; // 设置逻辑语法结束标签
