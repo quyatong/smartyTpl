@@ -122,8 +122,6 @@ define(function(require) {
      * 插件函数枚举（用于处理相关函数）
      * @type {Object}
      */
-
-
     var plugIns = {
         escape: function (operand, params) {
             
