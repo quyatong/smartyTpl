@@ -7,9 +7,9 @@ smartyTpl
 
 解决思路：通过工具转化后端语法，让其可以产生前端可用模板。
 
-#####`smartyTpl` 具体用法如下：
+##### `smartyTpl` 具体用法如下：
 
-#####1、处理前后端公共模板
+##### 1、处理前后端公共模板
 
 抽取模板到tpl文件中，文件头部添加 `{%literal%}`，尾部添加 `{%/literal%}`，目的是阻止smarty语法解析。
 
@@ -30,9 +30,9 @@ smartyTpl
 ````
 
 
-#####2、引入模板
+##### 2、引入模板
 
-######1）smarty模板
+###### 1）smarty模板
 
 因tpl已添加`literal`标签，用传统的include引入文件方式后端不会解析，需要利用include从字符串方式让smarty模板可以解析。
 
@@ -41,7 +41,7 @@ smartyTpl
     {%include file="string:$tpl_string"%}
 ````
   
-######2）前端模板    
+###### 2）前端模板    
 
 直接新建一个type=text/template的script标签，用传统的include方式引入放入标签中。
 
@@ -51,7 +51,7 @@ smartyTpl
     </script>
 ````
     
-#####3、使用前端模板
+##### 3、使用前端模板
 
 ````
     var smartyTpl = require('smartyTpl');
